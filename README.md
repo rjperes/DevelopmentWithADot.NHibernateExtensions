@@ -1,0 +1,2 @@
+DevelopmentWithADot.NHibernateSessionExtensions
+===============================================
