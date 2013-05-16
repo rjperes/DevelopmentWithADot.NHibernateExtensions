@@ -7,7 +7,6 @@ using NHibernate;
 using NHibernate.Engine;
 using NHibernate.Intercept;
 using NHibernate.Linq;
-using NHibernate.Persister.Entity;
 using NHibernate.Proxy;
 using NHibernate.Tuple;
 
@@ -15,7 +14,7 @@ namespace DevelopmentWithADot.NHibernateExtensions
 {
 	public static class SessionExtensions
 	{
-		public static System.Linq.IQueryable Query(this ISession session, Type entityType)
+		public static IQueryable Query(this ISession session, Type entityType)
 		{
 			MethodInfo method = typeof(LinqExtensionMethods).GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.InvokeMethod).Where(x => x.GetParameters()[0].ParameterType == typeof(ISession)).Single().MakeGenericMethod(entityType);
 			return(method.Invoke(null, new Object[] { session }) as System.Linq.IQueryable);
@@ -25,7 +24,7 @@ namespace DevelopmentWithADot.NHibernateExtensions
 		{
 			mode = mode ?? LockMode.None;
 
-			IEntityPersister persister = session.GetSessionImplementation().GetEntityPersister(NHibernateProxyHelper.GuessClass(entity).FullName, entity);
+			NHibernate.Persister.Entity.IEntityPersister persister = session.GetSessionImplementation().GetEntityPersister(NHibernateProxyHelper.GuessClass(entity).FullName, entity);
 			Object[] fields = persister.GetPropertyValues(entity, session.ActiveEntityMode);
 			Object id = persister.GetIdentifier(entity, session.ActiveEntityMode);
 			Object version = persister.GetVersion(entity, session.ActiveEntityMode);
@@ -34,7 +33,7 @@ namespace DevelopmentWithADot.NHibernateExtensions
 			return (entity);
 		}
 
-		public static Dictionary<String, Object> GetDirtyProperties<T>(this ISession session, T entity)
+		public static IDictionary<String, Object> GetDirtyProperties<T>(this ISession session, T entity)
 		{
 			ISessionImplementor sessionImpl = session.GetSessionImplementation();
 			IPersistenceContext context = sessionImpl.PersistenceContext;
@@ -45,7 +44,7 @@ namespace DevelopmentWithADot.NHibernateExtensions
 				return (null);
 			}
 
-			IEntityPersister persister = entry.Persister;
+			NHibernate.Persister.Entity.IEntityPersister persister = entry.Persister;
 			String[] propertyNames = persister.PropertyNames;
 			Object[] currentState = persister.GetPropertyValues(entity, sessionImpl.EntityMode);
 			Object[] loadedState = entry.LoadedState;
@@ -77,6 +76,12 @@ namespace DevelopmentWithADot.NHibernateExtensions
 			EntityEntry entry = pc.EntityEntries[entity] as EntityEntry;
 
 			return (entry);
+		}
+
+		public static Int32 Delete<T>(this ISession session)
+		{
+			String hql = String.Format("delete {0}", typeof(T));
+			return (session.CreateQuery(hql).ExecuteUpdate());
 		}
 
 		public static Boolean DeleteById<T>(this ISession session, Object id)
@@ -130,7 +135,7 @@ namespace DevelopmentWithADot.NHibernateExtensions
 			{
 				return (false);}
 
-			IEntityPersister persister = entry.Persister;
+			NHibernate.Persister.Entity.IEntityPersister persister = entry.Persister;
 			Object[] currentState = persister.GetPropertyValues(entity, sessionImpl.EntityMode);
 			Object[] loadedState = entry.LoadedState;
 			IEnumerable<StandardProperty> dp = (persister.EntityMetamodel.Properties.Where((property, i) => (LazyPropertyInitializer.UnfetchedProperty.Equals(loadedState[i]) == false) && (property.Type.IsDirty(loadedState[i], currentState[i], sessionImpl) == true))).ToArray();
@@ -149,7 +154,7 @@ namespace DevelopmentWithADot.NHibernateExtensions
 				return;
 			}
 
-			IEntityPersister persister = entry.Persister;
+			NHibernate.Persister.Entity.IEntityPersister persister = entry.Persister;
 			Object[] currentState = persister.GetPropertyValues(entity, sessionImpl.EntityMode);
 			Object[] loadedState = entry.LoadedState;
 			String[] propertyNames = persister.PropertyNames;			
