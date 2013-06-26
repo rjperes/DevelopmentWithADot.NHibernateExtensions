@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.Caching;
 using NHibernate.AdoNet;
 using NHibernate.Impl;
 using NHibernate.Linq;
@@ -14,6 +15,37 @@ namespace DevelopmentWithADot.NHibernateExtensions
 		private static readonly PropertyInfo sessionProperty = typeof(DefaultQueryProvider).GetProperty("Session", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.GetProperty);
 		private static readonly FieldInfo batcherInterceptorField = typeof(AbstractBatcher).GetField("_interceptor", BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly FieldInfo sessionImplInterceptorField = typeof(SessionImpl).GetField("interceptor", BindingFlags.NonPublic | BindingFlags.Instance);
+		#endregion
+
+		#region AsCacheable
+		public static IQueryable<T> AsCacheable<T>(this IQueryable<T> query, TimeSpan duration)
+		{
+			return (AsCacheable(query, (Int32) duration.TotalSeconds));
+		}
+
+		public static IQueryable<T> AsCacheable<T>(this IQueryable<T> query, Int32 seconds)
+		{
+			ObjectCache cache = null;
+
+			if (ObjectCache.Host != null)
+			{
+				cache = ObjectCache.Host.GetService(typeof(ObjectCache)) as ObjectCache;
+			}
+			else
+			{
+				cache = MemoryCache.Default;
+			}
+
+			if (cache.Contains(query.Expression.ToString()) == true)
+			{
+				return ((cache[query.Expression.ToString()] as IQueryable<T>).ToList().AsQueryable());
+			}
+			else
+			{
+				cache.Add(query.Expression.ToString(), query, DateTimeOffset.Now.AddSeconds(seconds));
+				return (query);
+			}
+		}
 		#endregion
 
 		#region ThenBy
