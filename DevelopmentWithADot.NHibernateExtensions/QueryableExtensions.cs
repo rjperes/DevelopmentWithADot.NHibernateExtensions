@@ -3,6 +3,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.Caching;
+using NHibernate;
 using NHibernate.AdoNet;
 using NHibernate.Impl;
 using NHibernate.Linq;
@@ -16,7 +17,41 @@ namespace DevelopmentWithADot.NHibernateExtensions
 		private static readonly FieldInfo batcherInterceptorField = typeof(AbstractBatcher).GetField("_interceptor", BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly FieldInfo sessionImplInterceptorField = typeof(SessionImpl).GetField("interceptor", BindingFlags.NonPublic | BindingFlags.Instance);
 		#endregion
+		
+		#region AsStateless
+		public static IOrderedQueryable<T> AsStateless<T>(this IOrderedQueryable<T> queryable)
+		{
+			return ((IOrderedQueryable<T>)AsStateless((IQueryable<T>)queryable));
+		}
 
+		public static IQueryable<T> AsStateless<T>(this IQueryable<T> queryable)
+		{
+			if (!(queryable is NhQueryable<T>))
+			{
+				return (queryable);
+			}
+			var session = sessionProperty.GetValue(queryable.Provider, null) as ISession;
+			return (new ActionQueryable<T>(queryable, x => session.Evict(x)));
+		}
+		#endregion
+
+		#region AsReadOnly
+		public static IOrderedQueryable<T> AsReadOnly<T>(this IOrderedQueryable<T> queryable)
+		{
+			return ((IOrderedQueryable<T>)AsReadOnly((IQueryable<T>)queryable));
+		}
+
+		public static IQueryable<T> AsReadOnly<T>(this IQueryable<T> queryable)
+		{
+			if (!(queryable is NhQueryable<T>))
+			{
+				return (queryable);
+			}
+			var session = sessionProperty.GetValue(queryable.Provider, null) as ISession;
+			var currentDefaultReadOnly = session.DefaultReadOnly;
+			return (new ActionQueryable<T>(queryable, null, () => { session.DefaultReadOnly = true; }, () => { session.DefaultReadOnly = currentDefaultReadOnly; }));
+		}
+		#endregion
 		#region AsCacheable
 		public static IQueryable<T> AsCacheable<T>(this IQueryable<T> query, TimeSpan duration)
 		{
